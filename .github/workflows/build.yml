@@ -1,0 +1,55 @@
+name: Construire l'appli Android
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flux-android/flux-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Copier l'appli dans le projet Android
+        run: npx cap sync android
+
+      - name: Compiler l'APK
+        working-directory: flux-android/flux-android/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease -Pvc=${{ github.run_number }} --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../Flux.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Flux-apk
+          path: flux-android/flux-android/Flux.apk
+
+      - name: Publier dans Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.${{ github.run_number }}
+          name: Flux v1.${{ github.run_number }}
+          body: Telecharge Flux.apk sur ton telephone Android et ouvre-le pour l'installer.
+          files: flux-android/flux-android/Flux.apk
+          make_latest: true
